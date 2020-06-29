@@ -1,0 +1,19 @@
+plugins {
+    id 'java'
+}
+
+group 'org.springframework'
+version '5.3.0-SNAPSHOT'
+
+repositories {
+    mavenCentral()
+}
+
+dependencies {
+    compile(project(":spring-beans"))
+    compile(project(":spring-core"))
+    compile(project(":spring-expression"))
+    compile(project(":spring-context"))
+    compile(project(":spring-instrument"))
+    testCompile group: 'junit', name: 'junit', version: '4.12'
+}
