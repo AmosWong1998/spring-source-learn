@@ -16,14 +16,10 @@
 
 package org.springframework.util.xml;
 
-import java.io.BufferedReader;
-import java.io.CharConversionException;
-import java.io.IOException;
-import java.io.InputStream;
-import java.io.InputStreamReader;
-
 import org.springframework.lang.Nullable;
 import org.springframework.util.StringUtils;
+
+import java.io.*;
 
 /**
  * Detects whether an XML stream is using DTD- or XSD-based validation.
@@ -83,39 +79,49 @@ public class XmlValidationModeDetector {
 	/**
 	 * Detect the validation mode for the XML document in the supplied {@link InputStream}.
 	 * Note that the supplied {@link InputStream} is closed by this method before returning.
+	 *
 	 * @param inputStream the InputStream to parse
 	 * @throws IOException in case of I/O failure
 	 * @see #VALIDATION_DTD
 	 * @see #VALIDATION_XSD
+	 * <p>
+	 * 根据InputStream自动检测XML文档的验证模式
 	 */
 	public int detectValidationMode(InputStream inputStream) throws IOException {
 		// Peek into the file to look for DOCTYPE.
 		BufferedReader reader = new BufferedReader(new InputStreamReader(inputStream));
 		try {
+			// 默认为非DTD模式 即XSD模式
 			boolean isDtdValidated = false;
 			String content;
+			// 循环，逐行读取XML文件
 			while ((content = reader.readLine()) != null) {
+				// 获取非注释的内容
 				content = consumeCommentTokens(content);
+				// 如果这一行都是注释，直接跳过 去读取下一行 具体为判断获取到的非注释内容content是否为null
 				if (this.inComment || !StringUtils.hasText(content)) {
 					continue;
 				}
+				// 包含DOCTYPE直接返回DTD模式
 				if (hasDoctype(content)) {
 					isDtdValidated = true;
 					break;
 				}
+				// hasOpeningTag 方法会校验，如果这一行有 < ，并且 < 后面跟着的是字母，则返回 true
+				// DTD格式文件默认开头：<!DOCTYPE  并且每个标签都会以 <! 开头
 				if (hasOpeningTag(content)) {
 					// End of meaningful data...
 					break;
 				}
 			}
+			// 返回DTD或者XSD模式
 			return (isDtdValidated ? VALIDATION_DTD : VALIDATION_XSD);
-		}
-		catch (CharConversionException ex) {
+		} catch (CharConversionException ex) {
 			// Choked on some character encoding...
 			// Leave the decision up to the caller.
+			// 返回 VALIDATION_AUTO 模式
 			return VALIDATION_AUTO;
-		}
-		finally {
+		} finally {
 			reader.close();
 		}
 	}
@@ -132,6 +138,8 @@ public class XmlValidationModeDetector {
 	 * Does the supplied content contain an XML opening tag. If the parse state is currently
 	 * in an XML comment then this method always returns false. It is expected that all comment
 	 * tokens will have consumed for the supplied content before passing the remainder to this method.
+	 * <p>
+	 * 如果这一行有 < ，并且 < 后面跟着的是字母，则返回 true
 	 */
 	private boolean hasOpeningTag(String content) {
 		if (this.inComment) {
@@ -146,10 +154,14 @@ public class XmlValidationModeDetector {
 	 * Consume all leading and trailing comments in the given String and return
 	 * the remaining content, which may be empty since the supplied content might
 	 * be all comment data.
+	 * <p>
+	 * 返回这一行中非注释的内容
 	 */
 	@Nullable
 	private String consumeCommentTokens(String line) {
+		// 获取注释头的在这一行中的位置 <!--
 		int indexOfStartComment = line.indexOf(START_COMMENT);
+		// 如果这一行没有注释，直接返回这一行的内容
 		if (indexOfStartComment == -1 && !line.contains(END_COMMENT)) {
 			return line;
 		}
@@ -181,6 +193,7 @@ public class XmlValidationModeDetector {
 
 	/**
 	 * Try to consume the {@link #START_COMMENT} token.
+	 *
 	 * @see #commentToken(String, String, boolean)
 	 */
 	private int startComment(String line) {
@@ -198,7 +211,7 @@ public class XmlValidationModeDetector {
 	 */
 	private int commentToken(String line, String token, boolean inCommentIfPresent) {
 		int index = line.indexOf(token);
-		if (index > - 1) {
+		if (index > -1) {
 			this.inComment = inCommentIfPresent;
 		}
 		return (index == -1 ? index : index + token.length());
