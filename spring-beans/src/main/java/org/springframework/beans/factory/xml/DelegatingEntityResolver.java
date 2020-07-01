@@ -16,14 +16,13 @@
 
 package org.springframework.beans.factory.xml;
 
-import java.io.IOException;
-
+import org.springframework.lang.Nullable;
+import org.springframework.util.Assert;
 import org.xml.sax.EntityResolver;
 import org.xml.sax.InputSource;
 import org.xml.sax.SAXException;
 
-import org.springframework.lang.Nullable;
-import org.springframework.util.Assert;
+import java.io.IOException;
 
 /**
  * {@link EntityResolver} implementation that delegates to a {@link BeansDtdResolver}
@@ -77,16 +76,35 @@ public class DelegatingEntityResolver implements EntityResolver {
 	}
 
 
+	/**
+	 *
+	 * @param publicId 被引用的外部实体的公共标识符，如果没有提供，则返回 null 。
+	 * @param systemId 被引用的外部实体的系统标识符。
+	 * @return
+	 * @throws SAXException
+	 * @throws IOException
+	 *
+	 * XSD 验证模式
+	 * publicId：null
+	 * systemId：http://www.springframework.org/schema/beans/spring-beans.xsd
+	 * DTD 验证模式
+	 * publicId：-//SPRING//DTD BEAN 2.0//EN
+	 * systemId：http://www.springframework.org/dtd/spring-beans.dtd
+	 */
 	@Override
 	@Nullable
 	public InputSource resolveEntity(@Nullable String publicId, @Nullable String systemId)
 			throws SAXException, IOException {
 
 		if (systemId != null) {
+			// DTD模式 .dtd
 			if (systemId.endsWith(DTD_SUFFIX)) {
+				// 使用 BeansDtdResolver 来进行解析
 				return this.dtdResolver.resolveEntity(publicId, systemId);
 			}
+			// XSD模式 .xsd
 			else if (systemId.endsWith(XSD_SUFFIX)) {
+				// 使用 PluggableSchemaResolver 来进行解析
 				return this.schemaResolver.resolveEntity(publicId, systemId);
 			}
 		}
