@@ -1,4 +1,4 @@
-package pers.amos.spring.test.ch1;
+package pers.amos.spring.beanDefinition;
 
 /**
  * @author amos wong

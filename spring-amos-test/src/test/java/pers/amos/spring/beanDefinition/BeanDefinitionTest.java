@@ -1,4 +1,4 @@
-package pers.amos.spring.test.ch1;
+package pers.amos.spring.beanDefinition;
 
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.support.DefaultListableBeanFactory;
@@ -24,5 +24,9 @@ public class BeanDefinitionTest {
 		XmlBeanDefinitionReader reader = new XmlBeanDefinitionReader(factory); // <3>
 		// 装载资源
 		reader.loadBeanDefinitions(resource); // <4>
+
+
+
+
 	}
 }
