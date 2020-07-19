@@ -24,9 +24,5 @@ public class BeanDefinitionTest {
 		XmlBeanDefinitionReader reader = new XmlBeanDefinitionReader(factory); // <3>
 		// 装载资源
 		reader.loadBeanDefinitions(resource); // <4>
-
-
-
-
 	}
 }

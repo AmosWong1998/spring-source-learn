@@ -226,29 +226,40 @@ public class DefaultBeanDefinitionDocumentReader implements BeanDefinitionDocume
 	 * from the given resource into the bean factory.
 	 */
 	protected void importBeanDefinitionResource(Element ele) {
+		// <1> 获取 resource 的属性值
+		// <import resource="bean-test2.xml"> 这里获取的就是bean-test2.xml
 		String location = ele.getAttribute(RESOURCE_ATTRIBUTE);
+		// 如果resource为空 直接报错
 		if (!StringUtils.hasText(location)) {
 			getReaderContext().error("Resource location must not be empty", ele);
 			return;
 		}
 
+		// 解析系统属性，格式如 ："${user.dir}"
 		// Resolve system properties: e.g. "${user.dir}"
 		location = getReaderContext().getEnvironment().resolveRequiredPlaceholders(location);
 
+		// 实际 Resource 集合，即 import 的地址，有哪些 Resource 资源
 		Set<Resource> actualResources = new LinkedHashSet<>(4);
 
+		// 判断 location 是相对路径还是绝对路径
 		// Discover whether the location is an absolute or relative URI
 		boolean absoluteLocation = false;
 		try {
+			// 以 classpath*: 或者 classpath: 开头的为绝对路径。
 			absoluteLocation = ResourcePatternUtils.isUrl(location) || ResourceUtils.toURI(location).isAbsolute();
 		} catch (URISyntaxException ex) {
 			// cannot convert to an URI, considering the location relative
 			// unless it is the well-known Spring prefix "classpath*:"
 		}
 
+		// 绝对路径
 		// Absolute or relative?
 		if (absoluteLocation) {
 			try {
+				// 添加配置文件地址的 Resource 到 actualResources 中，并加载相应的 BeanDefinition 们
+				// 调用AbstractBeanDefinitionReader.loadBeanDefinitions()方法
+				// 这个方法内部会递归调用XMLDefinitionReader#loadBeanDefinitions 先去加载import的资源
 				int importCount = getReaderContext().getReader().loadBeanDefinitions(location, actualResources);
 				if (logger.isTraceEnabled()) {
 					logger.trace("Imported " + importCount + " bean definitions from URL location [" + location + "]");
@@ -257,17 +268,29 @@ public class DefaultBeanDefinitionDocumentReader implements BeanDefinitionDocume
 				getReaderContext().error(
 						"Failed to import bean definitions from URL location [" + location + "]", ele, ex);
 			}
+			// 相对路径
 		} else {
 			// No URL -> considering resource location as relative to the current file.
 			try {
 				int importCount;
+				// 创建相对地址的 Resource
 				Resource relativeResource = getReaderContext().getResource().createRelative(location);
+				// 资源存在
 				if (relativeResource.exists()) {
+					// 加载 relativeResource 中的 BeanDefinition 们
+					// 这里直接递归调用XMLBeanDefinitionReader#loadBeanDefinitions()
 					importCount = getReaderContext().getReader().loadBeanDefinitions(relativeResource);
 					actualResources.add(relativeResource);
+					// 资源不存在
 				} else {
+					// 获取根路径
 					String baseLocation = getReaderContext().getResource().getURL().toString();
+					/* 添加配置文件地址的 Resource 到 actualResources 中，并加载相应的 BeanDefinition 们
+					 这里调用的是AbstractBeanDefinition#loadBeanDefinitions()方法 因为资源不存在
+					 所以需要在该方法中 根据location去加载资源，
+					 然后才去调用XmlBeanDefinitionReader#loadBeanDefinitions()*/
 					importCount = getReaderContext().getReader().loadBeanDefinitions(
+							// 计算出绝对路径
 							StringUtils.applyRelativePath(baseLocation, location), actualResources);
 				}
 				if (logger.isTraceEnabled()) {
@@ -280,6 +303,7 @@ public class DefaultBeanDefinitionDocumentReader implements BeanDefinitionDocume
 						"Failed to import bean definitions from relative location [" + location + "]", ele, ex);
 			}
 		}
+		// <6> 解析成功后，进行监听器激活处理
 		Resource[] actResArray = actualResources.toArray(new Resource[0]);
 		getReaderContext().fireImportProcessed(location, actResArray, extractSource(ele));
 	}
