@@ -176,7 +176,7 @@ public class DefaultBeanDefinitionDocumentReader implements BeanDefinitionDocume
 	 * Spring 有两种 Bean 声明方式：
 	 * 配置文件式声明：<bean id="studentService" class="org.springframework.core.StudentService" /> 。对应 <1> 处。
 	 * 自定义注解方式：<tx:annotation-driven> 。对应 <2> 处。
-	 *
+	 * <p>
 	 * Parse the elements at the root level in the document:
 	 * "import", "alias", "bean".
 	 *
@@ -337,19 +337,34 @@ public class DefaultBeanDefinitionDocumentReader implements BeanDefinitionDocume
 	/**
 	 * Process the given bean element, parsing the bean definition
 	 * and registering it with the registry.
+	 * 1. 调用 BeanDefinitionParserDelegate#parseBeanDefinitionElement(Element ele, BeanDefinitionParserDelegate delegate) 方法，进行元素解析。
+	 * 		如果解析失败，则返回 null，错误由 ProblemReporter 处理。
+	 * 		如果解析成功，则返回 BeanDefinitionHolder 实例 bdHolder 。BeanDefinitionHolder 为持有 name 和 alias 的 BeanDefinition。
+	 * 		详细解析，见 「2. parseBeanDefinitionElement」 。
+	 * 2. 若实例 bdHolder 不为空，则调用 BeanDefinitionParserDelegate
+	 * #decorateBeanDefinitionIfRequired(Element ele, BeanDefinitionHolder bdHolder) 方法，进行自定义标签处理。
+	 * 3. 解析完成后，则调用 BeanDefinitionReaderUtils
+	 * #registerBeanDefinition(BeanDefinitionHolder definitionHolder, BeanDefinitionRegistry registry) 方法，对 bdHolder 进行 BeanDefinition 的注册。
+	 * 4. 发出响应事件，通知相关的监听器，完成 Bean 标签解析。
 	 */
 	protected void processBeanDefinition(Element ele, BeanDefinitionParserDelegate delegate) {
+		// 进行 bean 元素解析。
+		// <1> 如果解析成功，则返回 BeanDefinitionHolder 对象。而 BeanDefinitionHolder 为 name 和 alias 的 BeanDefinition 对象
+		// 如果解析失败，则返回 null 。
 		BeanDefinitionHolder bdHolder = delegate.parseBeanDefinitionElement(ele);
 		if (bdHolder != null) {
+			// 进行自定义的标签处理
 			bdHolder = delegate.decorateBeanDefinitionIfRequired(ele, bdHolder);
 			try {
 				// Register the final decorated instance.
+				// 注册BeanDefinition
 				BeanDefinitionReaderUtils.registerBeanDefinition(bdHolder, getReaderContext().getRegistry());
 			} catch (BeanDefinitionStoreException ex) {
 				getReaderContext().error("Failed to register bean definition with name '" +
 						bdHolder.getBeanName() + "'", ele, ex);
 			}
 			// Send registration event.
+			// <4> 发出响应事件，通知相关的监听器，已完成该 Bean 标签的解析。
 			getReaderContext().fireComponentRegistered(new BeanComponentDefinition(bdHolder));
 		}
 	}
