@@ -154,9 +154,13 @@ public class DefaultSingletonBeanRegistry extends SimpleAliasRegistry implements
 	 */
 	protected void addSingleton(String beanName, Object singletonObject) {
 		synchronized (this.singletonObjects) {
+			// Bean实例完成创建之后，只保留一级缓存以及注册beanName的顺序 其余的移除
 			this.singletonObjects.put(beanName, singletonObject);
+			// 从三级缓存中移除
 			this.singletonFactories.remove(beanName);
+			// 从二级缓存中移除
 			this.earlySingletonObjects.remove(beanName);
+			// 添加到已创建bean的列表
 			this.registeredSingletons.add(beanName);
 		}
 	}
@@ -183,6 +187,7 @@ public class DefaultSingletonBeanRegistry extends SimpleAliasRegistry implements
 	@Override
 	@Nullable
 	public Object getSingleton(String beanName) {
+		// true代表允许立即加载
 		return getSingleton(beanName, true);
 	}
 
@@ -207,11 +212,17 @@ public class DefaultSingletonBeanRegistry extends SimpleAliasRegistry implements
 	protected Object getSingleton(String beanName, boolean allowEarlyReference) {
 		// 以beanName为key 从map中获取bean
 		// 从单例缓冲中加载 bean
+		/* 尝试从一级缓存中获取完备的Bean 一级缓存是为了专门保存完整的bean实例*/
 		Object singletonObject = this.singletonObjects.get(beanName);
 		// bean为null 并且正在创建
+		/* 如果完备的bean没有被创建出来，创建中的bean的名字会被保存在singletonsCurrentlyInCreation中 */
 		if (singletonObject == null && isSingletonCurrentlyInCreation(beanName)) {
+			/* 尝试给一级缓存对象加锁 下面来操作缓存 */
 			synchronized (this.singletonObjects) {
 				// 从earlySingletonObjects中获取
+				/* 尝试从二级缓存earlySingletonObjects这个存储还没进行属性添加操作的Bean实例缓存中获取
+				   为什么二级缓存中的bean还没添加属性就可以返回？主要是为了解决循环依赖的问题
+				 */
 				singletonObject = this.earlySingletonObjects.get(beanName);
 				// earlySingletonObjects为null 并且 允许提前创建
 				if (singletonObject == null && allowEarlyReference) {
@@ -241,9 +252,12 @@ public class DefaultSingletonBeanRegistry extends SimpleAliasRegistry implements
 	 */
 	public Object getSingleton(String beanName, ObjectFactory<?> singletonFactory) {
 		Assert.notNull(beanName, "Bean name must not be null");
+		// 给一级缓存上锁
 		synchronized (this.singletonObjects) {
+			// 再次从一级缓存获取实例，防止已经被别的线程创建出来了
 			Object singletonObject = this.singletonObjects.get(beanName);
 			if (singletonObject == null) {
+				// 判断当前容器是否在销毁单例
 				if (this.singletonsCurrentlyInDestruction) {
 					throw new BeanCreationNotAllowedException(beanName,
 							"Singleton bean creation not allowed while singletons of this factory are in destruction " +
@@ -259,6 +273,7 @@ public class DefaultSingletonBeanRegistry extends SimpleAliasRegistry implements
 					this.suppressedExceptions = new LinkedHashSet<>();
 				}
 				try {
+					// 调用ObjectFactory#getObject()方法 创建bean
 					singletonObject = singletonFactory.getObject();
 					newSingleton = true;
 				}
@@ -282,9 +297,10 @@ public class DefaultSingletonBeanRegistry extends SimpleAliasRegistry implements
 					if (recordSuppressedExceptions) {
 						this.suppressedExceptions = null;
 					}
+					// bean创建后的操作
 					afterSingletonCreation(beanName);
 				}
-				if (newSingleton) {
+				if (newSingleton) { // 判断是否为新创建的单例，前面已经设置为true了
 					addSingleton(beanName, singletonObject);
 				}
 			}
@@ -380,9 +396,10 @@ public class DefaultSingletonBeanRegistry extends SimpleAliasRegistry implements
 	 * @see #isSingletonCurrentlyInCreation
 	 */
 	protected void beforeSingletonCreation(String beanName) {
-		// 添加
+		// inCreationCheckExclusions 直接缓存当前不能加载的bean
+		// 主要用在web容器的拦截器里，所以这里可以忽略，因为肯定是不存在的
 		if (!this.inCreationCheckExclusions.contains(beanName) && !this.singletonsCurrentlyInCreation.add(beanName)) {
-			// 如果添加失败，则抛出 BeanCurrentlyInCreationException 异常
+			// 当beanName已经存在于set中 就会添加失败
 			throw new BeanCurrentlyInCreationException(beanName);
 		}
 	}
@@ -394,7 +411,7 @@ public class DefaultSingletonBeanRegistry extends SimpleAliasRegistry implements
 	 * @see #isSingletonCurrentlyInCreation
 	 */
 	protected void afterSingletonCreation(String beanName) {
-		// 移除，则一定就是对 singletonsCurrentlyInCreation 集合 remove
+		// 已经创建完成了，会把beanName从正在创建的列表中移除
 		if (!this.inCreationCheckExclusions.contains(beanName) && !this.singletonsCurrentlyInCreation.remove(beanName)) {
 			throw new IllegalStateException("Singleton '" + beanName + "' isn't currently in creation");
 		}
@@ -446,7 +463,12 @@ public class DefaultSingletonBeanRegistry extends SimpleAliasRegistry implements
 		String canonicalName = canonicalName(beanName);
 
 		synchronized (this.dependentBeanMap) {
+			// computeIfAbsent:若key对应的value为空，会将第二个参数的返回值存入并且返回
+			// dependentBeanMap中存放着当前Bean所被引用的Bean的集合
+			// 比如当前需要实例化的是Bean的名字是userInfo,userInfo中有个Human
+			// 类型的属性human，那么就有human被userInfo的引用关系 human = {userInfo}
 			Set<String> dependentBeans =
+					/* dependentBeanMap保存的是被依赖的关系 key被value所依赖 */
 					this.dependentBeanMap.computeIfAbsent(canonicalName, k -> new LinkedHashSet<>(8));
 			if (!dependentBeans.add(dependentBeanName)) {
 				return;
@@ -455,6 +477,7 @@ public class DefaultSingletonBeanRegistry extends SimpleAliasRegistry implements
 
 		synchronized (this.dependenciesForBeanMap) {
 			Set<String> dependenciesForBean =
+					/* dependenciesForBeanMap 存放当前Bean所依赖的Bean的集合 key依赖于value */
 					this.dependenciesForBeanMap.computeIfAbsent(dependentBeanName, k -> new LinkedHashSet<>(8));
 			dependenciesForBean.add(canonicalName);
 		}

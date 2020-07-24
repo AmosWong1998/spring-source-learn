@@ -1116,6 +1116,18 @@ public abstract class AbstractBeanDefinition extends BeanMetadataAttributeAccess
 	}
 
 	/**
+	 * 样例：
+	 * <bean id="myTestBean" class="io.spring.test.MyTestBean>
+	 * 	<lookup-method name="getUserBean" bean="teacher"/>
+	 * 	<replaced-method name="changedMethod" replacer="replacer"/>
+	 * </bean>
+	 * <bean id="teacher" class="io.spring.test.Teacher>
+	 * <bean id="student" class="io.spring.test.Student>
+	 * <bean id="replacer" class="io.spring.test.Replacer>
+	 *
+	 *  解析lookup-method: 去Teacher类里面去查找是否含有getUserBean这个方法 没有就报错
+	 *  解析replaced-method: 去MyTestBean类里面去查找是否含有changedMethod这个方法 没有就报错
+	 *
 	 * Validate and prepare the method overrides defined for this bean.
 	 * Checks for existence of a method with the specified name.
 	 * @throws BeanDefinitionValidationException in case of validation failure
@@ -1123,6 +1135,8 @@ public abstract class AbstractBeanDefinition extends BeanMetadataAttributeAccess
 	public void prepareMethodOverrides() throws BeanDefinitionValidationException {
 		// Check that lookup methods exist and determine their overloaded status.
 		if (hasMethodOverrides()) {
+			// getMethodOverrides() 获取BeanDefinition的methodOverrides属性
+			// methodOverrides属性存放的是look-up/replaced-method
 			getMethodOverrides().getOverrides().forEach(this::prepareMethodOverride);
 		}
 	}
@@ -1142,6 +1156,8 @@ public abstract class AbstractBeanDefinition extends BeanMetadataAttributeAccess
 					"' on class [" + getBeanClassName() + "]");
 		}
 		else if (count == 1) {
+			// 如果不存在重载，在使用 CGLIB 增强阶段就不需要进行校验了
+			// 直接找到某个方法进行增强即可，否则在增强阶段还需要做特殊处理
 			// Mark override as not overloaded, to avoid the overhead of arg type checking.
 			mo.setOverloaded(false);
 		}

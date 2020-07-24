@@ -486,13 +486,18 @@ public abstract class AbstractAutowireCapableBeanFactory extends AbstractBeanFac
 		// Make sure bean class is actually resolved at this point, and
 		// clone the bean definition in case of a dynamically resolved Class
 		// which cannot be stored in the shared merged bean definition.
+		// 判断需要创建的Bean是否可以实例化，即是否可以通过当前的类加载器进行加载
 		Class<?> resolvedClass = resolveBeanClass(mbd, beanName);
 		if (resolvedClass != null && !mbd.hasBeanClass() && mbd.getBeanClassName() != null) {
+			// 克隆一份BeanDefinition，用来设置上加载出来的class对象
+			// 之所以后续用该副本操作，是因为不希望将解析的class绑定到缓存中的BeanDefinition
+			// 因为class有可能是每次都需要动态解析出来的
 			mbdToUse = new RootBeanDefinition(mbd);
 			mbdToUse.setBeanClass(resolvedClass);
 		}
 
 		// Prepare method overrides.
+		// 校验和准备Bean中的方法覆盖
 		try {
 			mbdToUse.prepareMethodOverrides();
 		}
@@ -503,6 +508,10 @@ public abstract class AbstractAutowireCapableBeanFactory extends AbstractBeanFac
 
 		try {
 			// Give BeanPostProcessors a chance to return a proxy instead of the target bean instance.
+			// 如果Bean配置了初始化前和初始化后的处理器，则试图返回一个需要创建Bean的代理对象
+			// resolveBeforeInstantiation只是针对有自定义的targetSource
+			// 因为自定义的targetSource不是Spring的bean那么肯定不需要后续的一列的实例化和初始化
+			// 所以可以在resolveBeforeInstantiation直接进行proxy
 			Object bean = resolveBeforeInstantiation(beanName, mbdToUse);
 			if (bean != null) {
 				return bean;
@@ -1108,9 +1117,12 @@ public abstract class AbstractAutowireCapableBeanFactory extends AbstractBeanFac
 		Object bean = null;
 		if (!Boolean.FALSE.equals(mbd.beforeInstantiationResolved)) {
 			// Make sure bean class is actually resolved at this point.
+			// mbd.isSynthetic() 默认是false
+			// 如果注册了InstantiationAwareBeanPostProcessors类型的BeanPostProcessor
 			if (!mbd.isSynthetic() && hasInstantiationAwareBeanPostProcessors()) {
 				Class<?> targetType = determineTargetType(beanName, mbd);
 				if (targetType != null) {
+					// 后置器 使用责任链模式
 					bean = applyBeanPostProcessorsBeforeInstantiation(targetType, beanName);
 					if (bean != null) {
 						bean = applyBeanPostProcessorsAfterInitialization(bean, beanName);
@@ -1138,6 +1150,8 @@ public abstract class AbstractAutowireCapableBeanFactory extends AbstractBeanFac
 		for (BeanPostProcessor bp : getBeanPostProcessors()) {
 			if (bp instanceof InstantiationAwareBeanPostProcessor) {
 				InstantiationAwareBeanPostProcessor ibp = (InstantiationAwareBeanPostProcessor) bp;
+				// 哪个后置处理器 处理并且返回结果
+				// 只要有一个后置处理器返回了结果 后面的都不在执行了
 				Object result = ibp.postProcessBeforeInstantiation(beanClass, beanName);
 				if (result != null) {
 					return result;

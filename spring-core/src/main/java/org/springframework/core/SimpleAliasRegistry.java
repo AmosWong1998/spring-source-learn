@@ -219,7 +219,8 @@ public class SimpleAliasRegistry implements AliasRegistry {
 		// Handle aliasing...
 		String resolvedName;
 		do {
-			// 从aliasMap中取出
+			// 当前这个beanName可能是别名，因此尝试从aliasMap中取出beanName
+			// 为了防止获取到的 依然是别名的别名 这里使用循环递归查找 最后一个肯定是beanName
 			resolvedName = this.aliasMap.get(canonicalName);
 			if (resolvedName != null) {
 				canonicalName = resolvedName;
